@@ -51,11 +51,14 @@ def compute_composite_score(df):
         df["score_ma"]        * weights["ma"]
     ).round(0).astype(int)
     
-    # Signal
+    # Signal - criteria adapted to BRVM market
     df["signal"] = "WATCH"
-    df.loc[(df["composite_score"] >= 70) & (df["rsi_14"] < 50), "signal"] = "BUY"
-    df.loc[(df["composite_score"] >= 55) & (df["signal"] != "BUY"), "signal"] = "HOLD"
+    df.loc[(df["composite_score"] >= 70), "signal"] = "BUY"
+    df.loc[(df["composite_score"] >= 55) & (df["composite_score"] < 70), "signal"] = "HOLD"
     df.loc[df["composite_score"] < 40, "signal"] = "SELL"
+    
+    # Downgrade BUY to HOLD if RSI is overbought (>75)
+    df.loc[(df["signal"] == "BUY") & (df["rsi_14"] > 75), "signal"] = "HOLD"
     
     return df
 

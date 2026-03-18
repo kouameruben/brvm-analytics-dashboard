@@ -174,64 +174,112 @@ def scrape_stock_list():
 
 def scrape_statistics(ticker):
     """Scrape fundamental statistics for one ticker from stockanalysis.com."""
-    url = f"https://stockanalysis.com/quote/brvm/{ticker}/statistics/"
+    stats = {}
+    
+    # --- Page 1: Statistics ---
     try:
+        url = f"https://stockanalysis.com/quote/brvm/{ticker}/statistics/"
         resp = requests.get(url, headers=HEADERS, verify=False, timeout=15)
         resp.raise_for_status()
         soup = BeautifulSoup(resp.text, "html.parser")
         
-        stats = {}
-        # Find all key-value pairs in tables
         for table in soup.find_all("table"):
-            rows = table.find_all("tr")
-            for row in rows:
+            for row in table.find_all("tr"):
                 cells = row.find_all("td")
                 if len(cells) == 2:
                     key = cells[0].get_text(strip=True).lower()
                     val = cells[1].get_text(strip=True)
                     
-                    if "pe ratio" == key:
+                    if key == "pe ratio":
                         stats["pe_ratio"] = parse_num(val)
-                    elif "forward pe" == key:
+                    elif key == "forward pe":
                         stats["forward_pe"] = parse_num(val)
-                    elif "pb ratio" == key:
+                    elif key == "pb ratio":
                         stats["pb_ratio"] = parse_num(val)
                     elif "return on equity" in key:
                         stats["roe_pct"] = parse_num(val)
                     elif "earnings per share" in key:
                         stats["eps"] = parse_num(val)
-                    elif "beta" in key and "beta" == key.split("(")[0].strip():
+                    elif key.startswith("beta"):
                         stats["beta"] = parse_num(val)
                     elif "relative strength" in key:
                         stats["rsi_14"] = parse_num(val)
-                    elif "dividend" in key and "yield" not in key and "date" not in key:
-                        pass
-                    elif "book value per share" == key:
+                    elif key == "book value per share":
                         stats["book_value"] = parse_num(val)
+                    elif key == "dividend yield":
+                        stats["div_yield_pct"] = parse_num(val)
         
-        # Also extract dividend info from overview page header
-        text = soup.get_text()
-        div_match = re.search(r'Dividend.*?([\d,.]+)\s*\(([\d,.]+)%\)', text)
+        # Try to get dividend from page text - multiple patterns
+        text = soup.get_text(separator=" ")
+        
+        # Pattern 1: "Dividend 1,838.89 (7.21%)" from overview header
+        div_match = re.search(r'Dividend\s+([\d,]+(?:\.\d+)?)\s*(?:XOF)?\s*\(([\d.]+)%\)', text)
         if div_match:
             stats["dividend"] = parse_num(div_match.group(1))
-            stats["div_yield_pct"] = parse_num(div_match.group(2))
+            if "div_yield_pct" not in stats or stats["div_yield_pct"] is None:
+                stats["div_yield_pct"] = parse_num(div_match.group(2))
         
-        return stats
+        # Pattern 2: "1,838.89 (7.21%)" near dividend context
+        if not stats.get("div_yield_pct"):
+            div_match2 = re.search(r'([\d,]+(?:\.\d+)?)\s*\(([\d.]+)%\)', text)
+            if div_match2 and parse_num(div_match2.group(2)):
+                yield_val = parse_num(div_match2.group(2))
+                if yield_val and 0.5 < yield_val < 20:  # Reasonable dividend yield range
+                    stats["div_yield_pct"] = yield_val
+                    if not stats.get("dividend"):
+                        stats["dividend"] = parse_num(div_match2.group(1))
     except Exception:
-        return {}
+        pass
+    
+    # --- Page 2: Dividend page (more reliable for yield) ---
+    if not stats.get("div_yield_pct"):
+        try:
+            url2 = f"https://stockanalysis.com/quote/brvm/{ticker}/dividend/"
+            resp2 = requests.get(url2, headers=HEADERS, verify=False, timeout=15)
+            resp2.raise_for_status()
+            soup2 = BeautifulSoup(resp2.text, "html.parser")
+            text2 = soup2.get_text(separator=" ")
+            
+            # Multiple patterns for dividend yield
+            for pattern in [
+                r'Dividend\s+Yield\s+([\d.]+)\s*%',
+                r'yield\s+of\s+([\d.]+)\s*%',
+                r'Yield\s+([\d.]+)%',
+                r'([\d.]+)%\s*Annual\s*Dividend',
+            ]:
+                m = re.search(pattern, text2, re.IGNORECASE)
+                if m:
+                    stats["div_yield_pct"] = parse_num(m.group(1))
+                    break
+            
+            # Annual Dividend amount
+            for pattern in [
+                r'Annual\s+Dividend\s+([\d,]+(?:\.\d+)?)\s*XOF',
+                r'annual\s+dividend\s+of\s+([\d,]+(?:\.\d+)?)\s*XOF',
+                r'([\d,]+(?:\.\d+)?)\s*XOF\s*per\s*share',
+            ]:
+                m = re.search(pattern, text2, re.IGNORECASE)
+                if m:
+                    stats["dividend"] = parse_num(m.group(1))
+                    break
+        except Exception:
+            pass
+    
+    return stats
 
 
 def scrape_all_statistics(tickers):
     """Scrape statistics for all tickers."""
-    print(f"   [2/3] Scraping statistics for {len(tickers)} stocks...")
+    print(f"   [2/3] Scraping statistics for {len(tickers)} stocks (statistics + dividend pages)...")
     all_stats = {}
     for i, ticker in enumerate(tickers):
         print(f"         {i+1}/{len(tickers)} {ticker}...", end=" ", flush=True)
         stats = scrape_statistics(ticker)
         all_stats[ticker] = stats
         n_found = len([v for v in stats.values() if v is not None])
-        print(f"{n_found} metrics")
-        time.sleep(0.5)
+        div_info = f"div={stats.get('div_yield_pct', '?')}%" if stats.get('div_yield_pct') else "no div"
+        print(f"{n_found} metrics ({div_info})")
+        time.sleep(0.8)
     return all_stats
 
 

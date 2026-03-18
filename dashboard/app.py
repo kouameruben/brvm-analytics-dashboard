@@ -56,7 +56,17 @@ sectors = data["sectors"]
 
 # -- Header --
 st.markdown("# BRVM Analytics Dashboard")
-st.markdown("*Analyse du marche boursier regional - 20 actions, 8 pays UEMOA*")
+
+# Show extraction date
+source_file = Path(__file__).resolve().parent.parent / "data" / "processed" / "data_source.txt"
+if source_file.exists():
+    source_info = source_file.read_text(encoding="utf-8").strip()
+    date_line = [l for l in source_info.split("\n") if l.startswith("Date:")]
+    extraction_date = date_line[0].replace("Date: ", "") if date_line else "inconnue"
+    st.markdown(f"*Analyse du marche boursier regional - Donnees extraites le **{extraction_date}***")
+else:
+    st.markdown("*Analyse du marche boursier regional - 8 pays UEMOA*")
+
 st.markdown("---")
 
 # -- KPIs --
