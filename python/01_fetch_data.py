@@ -40,6 +40,58 @@ SIKA_CODES = {
     "BOABF":"BOABF.bf","CABC": "CABC.ci", "MVOM": "MVOM.ci", "LNBB": "LNBB.bj",
 }
 
+# Reference: French names + BRVM sectors for all tickers
+BRVM_REF = {
+    "SNTS":  {"nom": "SONATEL",                 "secteur": "Telecom"},
+    "ORAC":  {"nom": "ORANGE CI",               "secteur": "Telecom"},
+    "SGBC":  {"nom": "SGBCI",                   "secteur": "Banque"},
+    "ECOC":  {"nom": "ECOBANK CI",              "secteur": "Banque"},
+    "SIBC":  {"nom": "SIB",                     "secteur": "Banque"},
+    "SLBC":  {"nom": "SOLIBRA",                 "secteur": "Industrie"},
+    "UNLC":  {"nom": "UNILEVER CI",             "secteur": "Industrie"},
+    "ETIT":  {"nom": "ECOBANK TG",              "secteur": "Banque"},
+    "CBIBF": {"nom": "CORIS BANK INTL",         "secteur": "Banque"},
+    "BICC":  {"nom": "BICICI",                  "secteur": "Banque"},
+    "STBC":  {"nom": "SITAB",                   "secteur": "Industrie"},
+    "BOAC":  {"nom": "BOA CI",                  "secteur": "Banque"},
+    "NSBC":  {"nom": "NSIA BANQUE",             "secteur": "Banque"},
+    "BOAB":  {"nom": "BOA BENIN",               "secteur": "Banque"},
+    "CFAC":  {"nom": "CFAO MOTORS CI",          "secteur": "Distribution"},
+    "BICB":  {"nom": "BIIC BENIN",              "secteur": "Banque"},
+    "ORGT":  {"nom": "ORAGROUP TG",             "secteur": "Banque"},
+    "BOAS":  {"nom": "BOA SENEGAL",             "secteur": "Banque"},
+    "BOABF": {"nom": "BOA BURKINA FASO",        "secteur": "Banque"},
+    "SPHC":  {"nom": "SAPH CI",                 "secteur": "Agriculture"},
+    "ONTBF": {"nom": "ONATEL BF",               "secteur": "Telecom"},
+    "SOGC":  {"nom": "SOGB CI",                 "secteur": "Agriculture"},
+    "CIEC":  {"nom": "CIE CI",                  "secteur": "Services publics"},
+    "TTLC":  {"nom": "TOTALENERGIES CI",        "secteur": "Energie"},
+    "PALC":  {"nom": "PALM CI",                 "secteur": "Agriculture"},
+    "SHEC":  {"nom": "VIVO ENERGY CI",          "secteur": "Energie"},
+    "BOAM":  {"nom": "BOA MALI",                "secteur": "Banque"},
+    "SDSC":  {"nom": "AGL (ex-BOLLORE)",        "secteur": "Transport"},
+    "SDCC":  {"nom": "SODECI",                  "secteur": "Services publics"},
+    "PRSC":  {"nom": "TRACTAFRIC MOTORS CI",    "secteur": "Distribution"},
+    "SEMC":  {"nom": "CROWN SIEM",              "secteur": "Assurance"},
+    "FTSC":  {"nom": "FILTISAC CI",             "secteur": "Industrie"},
+    "UNXC":  {"nom": "UNIWAX CI",               "secteur": "Industrie"},
+    "SVOC":  {"nom": "SUCRIVOIRE",              "secteur": "Agriculture"},
+    "TTLS":  {"nom": "TOTAL SENEGAL",           "secteur": "Energie"},
+    "SMBC":  {"nom": "SMB CI",                  "secteur": "Banque"},
+    "BNBC":  {"nom": "BERNABE CI",              "secteur": "Distribution"},
+    "NEIC":  {"nom": "NEI-CEDA CI",             "secteur": "Industrie"},
+    "SAFC":  {"nom": "SAFCA CI",                "secteur": "Finance"},
+    "STAC":  {"nom": "SETAO CI",                "secteur": "Industrie"},
+    "NTLC":  {"nom": "NESTLE CI",               "secteur": "Industrie"},
+    "TTRC":  {"nom": "TRACTAFRIC CI",           "secteur": "Distribution"},
+    "ABJC":  {"nom": "SERVAIR ABIDJAN",         "secteur": "Distribution"},
+    "SIVC":  {"nom": "AIR LIQUIDE CI",          "secteur": "Industrie"},
+    "CABC":  {"nom": "SICABLE CI",              "secteur": "Industrie"},
+    "MVOM":  {"nom": "MOVIS CI",                "secteur": "Transport"},
+    "LNBB":  {"nom": "LOTERIE DU BENIN",        "secteur": "Autres"},
+    "BOABF": {"nom": "BOA BURKINA FASO",        "secteur": "Banque"},
+}
+
 
 def parse_num(text):
     """Parse number from text: '2.90T' => 2900000000000, '28,995.0' => 28995"""
@@ -111,6 +163,11 @@ def scrape_stock_list():
     
     df = pd.DataFrame(records)
     df = df[df["price"].notna()].reset_index(drop=True)
+    
+    # Enrich with French names and BRVM sectors
+    df["company"] = df["ticker"].map(lambda t: BRVM_REF.get(t, {}).get("nom", df.loc[df["ticker"]==t, "company"].values[0] if len(df.loc[df["ticker"]==t]) > 0 else t))
+    df["sector"] = df["ticker"].map(lambda t: BRVM_REF.get(t, {}).get("secteur", "Autres"))
+    
     print(f"         Found {len(df)} stocks")
     return df
 
